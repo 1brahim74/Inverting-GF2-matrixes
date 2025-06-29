@@ -1,4 +1,4 @@
-# Inverting-GF2-matricxes
+# Inverting-GF2-matrixes
 
 Author: Ibrahim Mammadov
 Contact: ibrahim.22@intl.zju.edu.cn
