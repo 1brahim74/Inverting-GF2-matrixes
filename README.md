@@ -39,23 +39,23 @@ This repository successfully demonstrates the functionality and correctness of t
 
 ---
 
-## Building the Code
+# Building the Code
 
 The tools are single‑file programs. You can compile them directly from the command line with a C++17‑compliant compiler (e.g., `g++`).
 
-# Binary Matrix Inversion
+## Binary Matrix Inversion
 cd Binary_Matrix_Inversion/
 
 g++ -std=c++17 -O2 -o gen_inv Invertible_matrix_generator.cpp
 
 g++ -std=c++17 -O2 -o invert strassen_inversion_pivoted.cpp
 
-# Generating Invertible Matrices
+## Generating Invertible Matrices
 cd ../Generating_Invertible_Matrices/
 
 g++ -std=c++17 -O2 -o gen_all generate_all_invertible_matrices.cpp
 
-# Repairing Singular Matrices
+## Repairing Singular Matrices
 cd ../Repairing_Singular_Matrices/
 
 g++ -std=c++17 -O2 -o gen_sing singular_matrix_generator.cpp
