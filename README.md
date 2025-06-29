@@ -45,16 +45,21 @@ The tools are single‑file programs. You can compile them directly from the com
 
 # Binary Matrix Inversion
 cd Binary_Matrix_Inversion/
+
 g++ -std=c++17 -O2 -o gen_inv Invertible_matrix_generator.cpp
+
 g++ -std=c++17 -O2 -o invert strassen_inversion_pivoted.cpp
 
 # Generating Invertible Matrices
 cd ../Generating_Invertible_Matrices/
+
 g++ -std=c++17 -O2 -o gen_all generate_all_invertible_matrices.cpp
 
 # Repairing Singular Matrices
 cd ../Repairing_Singular_Matrices/
+
 g++ -std=c++17 -O2 -o gen_sing singular_matrix_generator.cpp
+
 g++ -std=c++17 -O2 -o repair matrix_repair_guaranteed.cpp
 
 
@@ -63,7 +68,9 @@ g++ -std=c++17 -O2 -o repair matrix_repair_guaranteed.cpp
 This workflow demonstrates generating an invertible matrix and then finding its inverse.
 
 cd Binary_Matrix_Inversion/
+
 ./gen_inv            # Enter the size of the matrix (must be a power of 2): 8
+
 Creates matrix.txt containing a random, invertible 8×8 matrix
 
 ./invert             # Reads matrix.txt, computes its inverse, saves to answer.txt
@@ -73,7 +80,9 @@ This workflow demonstrates generating a singular matrix and then repairing it to
 
 
 cd Repairing_Singular_Matrices/
+
 ./gen_sing           # Enter matrix size n: 8
+
 Creates matrix.txt containing a random, singular 8×8 matrix
 
 ./repair             # Applies the guaranteed repair algorithm, saves to answer.txt
