@@ -25,7 +25,7 @@
  * @author Ibrahim Mammadov
  * @contact ibrahim.22@intl.zju.edu.cn
  * @brief Generates a random, singular (non-invertible) square matrix over GF(2).
- *
+ * @version 1.0
  * This program is designed to create test cases for algorithms that handle
  * singular matrices, such as matrix repair or inversion algorithms that need to
  * detect and report failure. It repeatedly generates random binary matrices

@@ -26,7 +26,7 @@
  * @contact ibrahim.22@intl.zju.edu.cn
  * @brief Implements a pivoted, recursive block matrix inversion algorithm over
  *        the finite field GF(2), using Strassen's algorithm for multiplication.
- *
+ * @version 0.9.0
  * This program reads a square binary matrix of a power-of-2 dimension from
  * a file named "matrix.txt". It then computes the inverse of this matrix
  * using a recursive method that can pivot between the A11 and A22 blocks

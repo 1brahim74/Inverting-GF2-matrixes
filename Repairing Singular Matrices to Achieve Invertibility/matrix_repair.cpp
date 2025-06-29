@@ -25,7 +25,7 @@
  * @author Ibrahim Mammadov
  * @contact ibrahim.22@intl.zju.edu.cn
  * @brief Makes a singular binary matrix invertible by flipping a minimal number of bits.
- *
+ * @version 1.0
  * This program reads a square binary matrix from "matrix.txt". It first computes
  * the rank of the matrix. If the matrix is singular (rank < N), it identifies the
  * linearly dependent rows and the "free" columns. It then applies a heuristic
