@@ -184,7 +184,7 @@ int main() {
         std::cerr << "Matrix is now invertible." << std::endl;
     }
 
-    // --- 6. Write the final (repaired) matrix ---
+    // --- 6. Write the final answer (the repaired matrix) to "answer.txt" ---
     std::ofstream fout("answer.txt");
     for (int i = 0; i < N; ++i) {
         for (int j = 0; j < N; ++j) fout << orig[i].test(j) << (j + 1 < N ? " " : "");
