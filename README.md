@@ -1,4 +1,5 @@
 # Inverting-GF2-matrixes
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Author: Ibrahim Mammadov
 Contact: ibrahim.22@intl.zju.edu.cn
