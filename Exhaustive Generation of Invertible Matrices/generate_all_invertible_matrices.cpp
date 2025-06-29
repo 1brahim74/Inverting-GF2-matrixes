@@ -25,7 +25,7 @@
  * @author Ibrahim Mammadov
  * @contact ibrahim.22@intl.zju.edu.cn
  * @brief Exhaustively generates all unique invertible n x n matrices over GF(2).
- * @version 1.0
+ * @version 1.0.0
  * This program leverages the LUP decomposition theorem, which states that any
  * invertible matrix A can be expressed as A = P * L * U, where:
  *   - P is a permutation matrix.

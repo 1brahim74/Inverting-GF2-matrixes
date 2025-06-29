@@ -25,7 +25,7 @@
  * @author Ibrahim Mammadov
  * @contact ibrahim.22@intl.zju.edu.cn
  * @brief Generates a random, invertible square matrix over the finite field GF(2).
- * @version 1.0
+ * @version 1.0.0
  * This program creates an invertible matrix by generating a random lower-triangular
  * matrix (L) and a random upper-triangular matrix (U), both with ones on the
  * diagonal. The final matrix A = L * U is guaranteed to be invertible. The user
