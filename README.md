@@ -22,18 +22,16 @@ This repository successfully demonstrates the functionality and correctness of t
 
 ## Project Structure
 
+```text
 .
 ├── Binary_Matrix_Inversion/
-│ ├── Invertible_matrix_generator.cpp
-│ └── strassen_inversion_pivoted.cpp
-│
+│   ├── Invertible_matrix_generator.cpp
+│   └── strassen_inversion_pivoted.cpp
 ├── Generating_Invertible_Matrices/
-│ └── generate_all_invertible_matrices.cpp
-│
+│   └── generate_all_invertible_matrices.cpp
 ├── Repairing_Singular_Matrices/
-│ ├── singular_matrix_generator.cpp
-│ └── matrix_repair_guaranteed.cpp
-│
+│   ├── singular_matrix_generator.cpp
+│   └── matrix_repair_guaranteed.cpp
 └── README.md
 
 
