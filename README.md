@@ -34,7 +34,7 @@ This repository successfully demonstrates the functionality and correctness of t
 │   └── matrix_repair_guaranteed.cpp
 └── README.md
 
-
+```
 ---
 
 # Building the Code
