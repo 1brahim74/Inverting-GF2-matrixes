@@ -98,7 +98,7 @@ Creates matrix.txt containing a random, singular 7×7 matrix
 
 | File                                   | Version | Purpose                                                       | Input              | Output                    |
 | -------------------------------------- | ------- | ------------------------------------------------------------- | ------------------ | ------------------------- |
-| `strassen_inversion.cpp`       | 0.9.0   | Inverts a matrix using a pivoted Strassen‑based algorithm     | User prompt | `answer.txt`,`matrix.txt`              |
+| `strassen_inversion.cpp`       | 0.9.0   | Inverts a matrix using a pivoted Strassen‑based algorithm     | User prompt or `matrix.txt` | `answer.txt`              |
 | `generate_all_invertible_matrices.cpp` | 1.0.0   | Exhaustively generates all unique invertible matrices for n   | User prompt (size) | `unique_GF2_matrices.txt` |
 | `matrix_repair.cpp`         | 1.0.0   | Repairs a singular matrix using a provably correct algorithm  | `matrix.txt` or User prompt       | `answer.txt`              |
 
