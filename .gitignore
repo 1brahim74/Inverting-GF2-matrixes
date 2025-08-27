@@ -1,3 +1,5 @@
 Binary_Matrix_inversion(initial)/strassen_inversion.cpp
 Binary_Matrix_inversion(initial)/Invertible_matrix_generator.cpp
 Generating_Invertible_Matrices(initial)/generate_all_invertible_matrices.cpp
+Repairing_Singular_Matrices(initial)/matrix_repair.cpp
+Repairing_Singular_Matrices(initial)/singular_matrix_generator.cpp
