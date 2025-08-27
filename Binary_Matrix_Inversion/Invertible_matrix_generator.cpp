@@ -24,13 +24,12 @@
  * @file Invertible_matrix_generator.cpp
  * @author Ibrahim Mammadov
  * @contact ibrahim.22@intl.zju.edu.cn
- * @brief Generates a random, invertible square matrix over the finite field GF(2).
- * @version 1.0.0
+ * @brief Generates a random, invertible square matrix of ANY size over GF(2).
+ * @version 1.1.0
  * This program creates an invertible matrix by generating a random lower-triangular
  * matrix (L) and a random upper-triangular matrix (U), both with ones on the
  * diagonal. The final matrix A = L * U is guaranteed to be invertible. The user
- * is prompted for a size, which must be a power of two to be compatible with
- * the accompanying Strassen inversion program. The resulting matrix is saved
+ * is prompted for any positive integer size. The resulting matrix is saved
  * to "matrix.txt".
  */
 
@@ -135,12 +134,13 @@ int main() {
     std::srand(static_cast<unsigned int>(std::time(0)));
 
     int n;
-    std::cout << "Enter the size of the matrix (must be a power of 2): ";
+    // CHANGED: Updated the prompt to ask for any size.
+    std::cout << "Enter the desired size of the square matrix (e.g., 3, 4, 5...): ";
     std::cin >> n;
 
-    // Input validation: ensure n is a positive power of 2.
-    if (!std::cin || n <= 0 || (n & (n - 1)) != 0) {
-        std::cerr << "Error: Invalid size. Please enter a positive power of 2 (e.g., 2, 4, 8, 16...)." << std::endl;
+    // CHANGED: Removed the power-of-two check. Now it just checks for a positive integer.
+    if (!std::cin || n <= 0) {
+        std::cerr << "Error: Invalid size. Please enter a positive integer (e.g., 1, 2, 3...)." << std::endl;
         return 1;
     }
 
