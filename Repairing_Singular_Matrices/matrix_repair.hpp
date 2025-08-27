@@ -1,5 +1,5 @@
-#ifndef MATRIX_REPAIR_HPP // CHANGED
-#define MATRIX_REPAIR_HPP // CHANGED
+#ifndef MATRIX_REPAIR_HPP
+#define MATRIX_REPAIR_HPP
 
 //
 // Copyright (c) 2023, Ibrahim Mammadov
@@ -23,115 +23,96 @@
 // SOFTWARE.
 //
 
+/**
+ * @file matrix_repair.hpp
+ * @author Ibrahim Mammadov
+ * @contact ibrahim.22@intl.zju.edu.cn
+ * @brief A header-only library for generating, repairing, and analyzing square binary matrices.
+ * @version 1.1.0
+ */
+
+#include <iostream>
 #include <vector>
 #include <string>
 #include <fstream>
 #include <sstream>
-#include <optional>
 #include <bitset>
 #include <numeric>   // For std::iota
-#include <utility>   // For std::swap and std::pair
+#include <utility>   // For std::swap, std::pair
 #include <algorithm> // For std::find
-#include <cstdlib>
-#include <ctime>
+#include <stdexcept> // For std::runtime_error
+#include <ctime>     // For std::time
+#include <cstdlib>   // For std::srand, std::rand
 
 namespace MatrixRepair {
 
-// --- Type Definitions ---
-using IntMatrix = std::vector<std::vector<int>>;
-
-/// Define a maximum matrix size for the bitset-based repair algorithm.
+/// Define a maximum matrix size for the bitset representation.
 const int MAXN = 2048;
-using BitsetMatrix = std::vector<std::bitset<MAXN>>;
+/// A type alias for a binary matrix, using std::bitset for efficiency.
+using BinaryMatrix = std::vector<std::bitset<MAXN>>;
+/// A type alias for storing the coordinates of flipped bits.
+using FlipCoordinates = std::vector<std::pair<int, int>>;
+
 
 /**
- * @brief A structure to hold the results of a matrix repair operation.
+ * @brief Computes the rank of a square matrix over the finite field GF(2).
+ * @param M The matrix to analyze.
+ * @param N The dimension of the square matrix.
+ * @return The rank of the matrix.
  */
-struct RepairResult {
-    BitsetMatrix repaired_matrix;                ///< The final, repaired (or original) matrix.
-    int initial_rank;                          ///< The rank of the matrix before repair.
-    int deficiency;                            ///< The rank deficiency (n - rank).
-    std::vector<std::pair<int, int>> flips;      ///< A list of (row, col) coordinates that were flipped.
-    bool was_already_invertible;               ///< True if no repair was needed.
-};
-
-// --- Internal Helper Functions (Anonymous Namespace) ---
-namespace {
-
-    // --- Helpers for Singular Matrix Generation ---
-    IntMatrix generateRandomMatrix(int n) {
-        IntMatrix A(n, std::vector<int>(n, 0));
-        for (int i = 0; i < n; i++) {
-            for (int j = 0; j < n; j++) {
-                A[i][j] = std::rand() % 2;
-            }
+int compute_rank(const BinaryMatrix& M, int N) {
+    if (N == 0) return 0;
+    auto A = M; // Work on a copy
+    int rank = 0;
+    for (int j = 0; j < N && rank < N; ++j) {
+        int pivot_row = rank;
+        while (pivot_row < N && !A[pivot_row].test(j)) {
+            pivot_row++;
         }
-        return A;
-    }
-
-    int computeRank(const IntMatrix &A) {
-        int n = A.size();
-        if (n == 0) return 0;
-        IntMatrix M = A;
-        int rank = 0;
-        for (int col = 0; col < n && rank < n; ++col) {
-            int pivotRow = rank;
-            while (pivotRow < n && M[pivotRow][col] == 0) {
-                pivotRow++;
-            }
-            if (pivotRow < n) {
-                std::swap(M[pivotRow], M[rank]);
-                for (int row = 0; row < n; ++row) {
-                    if (row != rank && M[row][col] == 1) {
-                        for (int k = col; k < n; k++) {
-                            M[row][k] ^= M[rank][k];
-                        }
-                    }
+        if (pivot_row < N) {
+            std::swap(A[pivot_row], A[rank]);
+            for (int i = 0; i < N; ++i) {
+                if (i != rank && A[i].test(j)) {
+                    A[i] ^= A[rank];
                 }
-                rank++;
             }
+            rank++;
         }
-        return rank;
     }
-
-    bool isInvertible(const IntMatrix &A) {
-        if (A.empty()) return false;
-        return computeRank(A) == (int)A.size();
-    }
-} // end anonymous namespace
-
-// --- Public API Functions ---
+    return rank;
+}
 
 /**
- * @brief Generates a random, singular square matrix over GF(2).
- * @param n The dimension of the matrix.
- * @return An optional containing the matrix. Returns std::nullopt if n is invalid.
+ * @brief Checks if a square matrix is invertible (i.e., has full rank) over GF(2).
+ * @param M The matrix to check.
+ * @param N The dimension of the square matrix.
+ * @return True if the matrix is invertible, false otherwise.
  */
-std::optional<IntMatrix> generateSingularMatrix(int n) {
-    if (n <= 0) return std::nullopt;
-    std::srand(static_cast<unsigned int>(std::time(0)));
-
-    IntMatrix A;
-    // Generate random matrices until a non-invertible one is found.
-    do {
-        A = generateRandomMatrix(n);
-    } while (isInvertible(A));
-    
-    return A;
+bool is_invertible(const BinaryMatrix& M, int N) {
+    if (N == 0) return false;
+    return compute_rank(M, N) == N;
 }
 
 /**
  * @brief Repairs a singular binary matrix to make it invertible.
- * @param singular_matrix The input matrix to repair.
- * @return A RepairResult struct containing the repaired matrix and details of the operation.
+ *
+ * This function takes a singular (non-invertible) square binary matrix and
+ * performs an optimal number of bit-flips to make it invertible. The algorithm
+ * is guaranteed to succeed by flipping exactly d bits, where d is the rank
+ * deficiency (d = N - rank).
+ *
+ * @param M_in The input matrix to repair.
+ * @param N The dimension of the square matrix.
+ * @param flips A reference to a vector that will be populated with the (row, col)
+ *              coordinates of the bits that were flipped.
+ * @return The repaired, now-invertible matrix. If the matrix is already
+ *         invertible, it is returned unchanged and the flips vector is empty.
  */
-RepairResult repairMatrix(const BitsetMatrix& singular_matrix) {
-    const int N = singular_matrix.size();
-    if (N == 0) {
-        return { {}, 0, 0, {}, false };
-    }
+BinaryMatrix repair_matrix(const BinaryMatrix& M_in, int N, FlipCoordinates& flips) {
+    flips.clear();
+    BinaryMatrix mat_repaired = M_in;
+    BinaryMatrix mat_gauss = M_in;
 
-    auto mat = singular_matrix;
     std::vector<int> original_row_indices(N);
     std::iota(original_row_indices.begin(), original_row_indices.end(), 0);
 
@@ -139,24 +120,24 @@ RepairResult repairMatrix(const BitsetMatrix& singular_matrix) {
     int rank = 0;
     for (int j = 0; j < N && rank < N; ++j) {
         int p = rank;
-        while (p < N && !mat[p].test(j)) ++p;
-        if (p < N) {
-            std::swap(mat[p], mat[rank]);
+        while (p < N && !mat_gauss[p].test(j)) ++p;
+
+        if (p < N) { // Found a pivot
+            std::swap(mat_gauss[p], mat_gauss[rank]);
             std::swap(original_row_indices[p], original_row_indices[rank]);
             pivot_cols.push_back(j);
             for (int i = 0; i < N; ++i) {
-                if (i != rank && mat[i].test(j)) mat[i] ^= mat[rank];
+                if (i != rank && mat_gauss[i].test(j)) mat_gauss[i] ^= mat_gauss[rank];
             }
             rank++;
         }
     }
 
-    int deficiency = N - rank;
-    if (deficiency == 0) {
-        return { singular_matrix, rank, 0, {}, true };
+    if (rank == N) {
+        return mat_repaired; // Already invertible, no flips needed.
     }
 
-    // Identify dependent rows (in their original positions) and free columns
+    // Identify Dependent Rows (from original indices) and Free Columns
     std::vector<int> dependent_rows;
     for (int i = rank; i < N; ++i) {
         dependent_rows.push_back(original_row_indices[i]);
@@ -168,61 +149,128 @@ RepairResult repairMatrix(const BitsetMatrix& singular_matrix) {
             free_cols.push_back(j);
         }
     }
-
-    // Apply flips to a fresh copy of the original matrix
-    auto repaired_mat = singular_matrix;
-    std::vector<std::pair<int, int>> flips;
+    
+    // Pair the k-th dependent row with the k-th free column and flip the bit.
+    int deficiency = N - rank;
     for (int k = 0; k < deficiency; ++k) {
         int row_to_fix = dependent_rows[k];
         int col_to_flip = free_cols[k];
-        repaired_mat[row_to_fix].flip(col_to_flip);
+        
+        mat_repaired[row_to_fix].flip(col_to_flip);
         flips.emplace_back(row_to_fix, col_to_flip);
     }
-
-    return { repaired_mat, rank, deficiency, flips, false };
+    
+    return mat_repaired;
 }
 
 
-// --- File I/O and Conversion Utilities ---
+/**
+ * @brief Generates a random n x n singular binary matrix.
+ *
+ * This function repeatedly generates random binary matrices until it finds one
+ * that is non-invertible.
+ *
+ * @param N The dimension of the square matrix.
+ * @return An n x n singular matrix.
+ */
+BinaryMatrix generate_singular_matrix(int N) {
+    if (N <= 0 || N > MAXN) {
+        throw std::invalid_argument("Matrix size N must be between 1 and MAXN.");
+    }
+    
+    // Seed the random number generator if it hasn't been seeded.
+    static bool seeded = false;
+    if (!seeded) {
+        std::srand(static_cast<unsigned int>(std::time(0)));
+        seeded = true;
+    }
 
-BitsetMatrix convertToBitsetMatrix(const IntMatrix& int_matrix) {
-    int n = int_matrix.size();
-    if (n == 0 || n > MAXN) return {};
-    BitsetMatrix bs_matrix(n);
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            if (int_matrix[i][j] == 1) {
-                bs_matrix[i].set(j);
+    BinaryMatrix A(N);
+    do {
+        for (int i = 0; i < N; i++) {
+            A[i].reset(); // Clear previous bits
+            for (int j = 0; j < N; j++) {
+                if (std::rand() % 2) {
+                    A[i].set(j);
+                }
             }
         }
-    }
-    return bs_matrix;
+    } while (is_invertible(A, N));
+
+    return A;
 }
 
-bool saveMatrixToFile(const IntMatrix& matrix, const std::string& filename) {
+
+/**
+ * @brief Reads a square binary matrix from a file.
+ * @param filename The path to the input file.
+ * @param N_out A reference to an integer that will store the detected matrix size.
+ * @return The matrix read from the file.
+ * @throws std::runtime_error if the file cannot be opened or is malformed.
+ */
+BinaryMatrix read_matrix_from_file(const std::string& filename, int& N_out) {
+    std::ifstream fin(filename);
+    if (!fin) {
+        throw std::runtime_error("Error: Could not open input file '" + filename + "'.");
+    }
+    
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(fin, line)) {
+        if (!line.empty()) lines.push_back(line);
+    }
+    fin.close();
+
+    N_out = lines.size();
+    if (N_out == 0) {
+        throw std::runtime_error("Error: Input file '" + filename + "' is empty.");
+    }
+    if (N_out > MAXN) {
+        throw std::runtime_error("Error: Matrix size exceeds MAXN.");
+    }
+
+    BinaryMatrix matrix(N_out);
+    for (int i = 0; i < N_out; ++i) {
+        std::stringstream ss(lines[i]);
+        int n_cols = 0;
+        for (int j = 0; j < N_out; ++j) {
+            int bit;
+            if (!(ss >> bit)) {
+                throw std::runtime_error("Error: Malformed matrix file. Row " + std::to_string(i) + " is too short.");
+            }
+            if (bit) matrix[i].set(j);
+            n_cols++;
+        }
+        if (n_cols != N_out) {
+             throw std::runtime_error("Error: Matrix is not square. Row " + std::to_string(i) + " has " + std::to_string(n_cols) + " columns, expected " + std::to_string(N_out));
+        }
+    }
+    return matrix;
+}
+
+/**
+ * @brief Writes a binary matrix to a file.
+ * @param M The matrix to write.
+ * @param N The dimension of the square matrix.
+ * @param filename The name of the file to save the matrix to.
+ * @return True on success, false on failure.
+ */
+bool write_matrix_to_file(const BinaryMatrix& M, int N, const std::string& filename) {
     std::ofstream fout(filename);
-    if (!fout) return false;
-    for (const auto& row : matrix) {
-        for (size_t j = 0; j < row.size(); ++j) {
-            fout << row[j] << (j == row.size() - 1 ? "" : " ");
+    if (!fout) {
+        std::cerr << "Error: Cannot open " << filename << " for writing." << std::endl;
+        return false;
+    }
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < N; ++j) {
+            fout << M[i].test(j) << (j + 1 < N ? " " : "");
         }
         fout << "\n";
     }
-    return true;
-}
-
-bool saveMatrixToFile(const BitsetMatrix& matrix, int n, const std::string& filename) {
-    std::ofstream fout(filename);
-    if (!fout) return false;
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            fout << matrix[i].test(j) << (j == n - 1 ? "" : " ");
-        }
-        fout << "\n";
-    }
+    fout.close();
     return true;
 }
 
 } // namespace MatrixRepair
 
-#endif // MATRIX_REPAIR_HPP // CHANGED
+#endif // MATRIX_REPAIR_HPP
