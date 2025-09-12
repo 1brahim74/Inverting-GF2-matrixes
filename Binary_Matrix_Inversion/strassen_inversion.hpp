@@ -94,7 +94,7 @@ namespace {
     }
 
     // --- Helpers for Strassen Matrix Inversion (Reformatted for Readability) ---
-    const size_t STRASSEN_CUTOFF = 16;
+    const size_t STRASSEN_CUTOFF = 4;
 
     // Forward declarations for recursive functions
     std::optional<BoolMatrix> strassenInverse(const BoolMatrix& A);
