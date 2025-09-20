@@ -3,20 +3,37 @@
 
 //
 // Copyright (c) 2023, Ibrahim Mammadov
-// MIT License (same as before)
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 //
 
 #include <vector>
 #include <string>
 #include <fstream>
-#include <set>
 #include <numeric>   // For std::iota
 #include <algorithm> // For std::next_permutation
+#include <utility>   // For std::pair
 
 /**
- * @brief A namespace for the exhaustive invertible matrix generator.
+ * @brief A namespace for generating invertible matrices using Bruhat decomposition.
  */
-namespace ExhaustiveGenerator {
+namespace InvertibleMatrixGenerator {
 
 using Matrix = std::vector<std::vector<int>>;
 
@@ -28,24 +45,33 @@ namespace {
     }
 
     Matrix multiplyMatrix(const Matrix& A, const Matrix& B) {
-        int n = (int)A.size();
-        int m = (int)B[0].size();
-        int p = (int)A[0].size();
+        int n = A.size();
+        int m = B[0].size();
+        int p = A[0].size();
         Matrix C = createMatrix(n, m);
         for (int i = 0; i < n; ++i) {
             for (int j = 0; j < m; ++j) {
-                int acc = 0;
                 for (int k = 0; k < p; ++k) {
-                    acc ^= (A[i][k] & B[k][j]); // XOR for GF(2) addition
+                    C[i][j] ^= (A[i][k] & B[k][j]); // XOR for GF(2) addition
                 }
-                C[i][j] = acc;
             }
         }
         return C;
     }
+    
+    Matrix transposeMatrix(const Matrix& M) {
+        int n = M.size();
+        Matrix T = createMatrix(n, n);
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                T[j][i] = M[i][j];
+            }
+        }
+        return T;
+    }
 
     Matrix generatePermutationMatrix(const std::vector<int>& perm) {
-        int n = (int)perm.size();
+        int n = perm.size();
         Matrix P = createMatrix(n, n);
         for (int i = 0; i < n; ++i) {
             P[i][perm[i]] = 1;
@@ -53,102 +79,47 @@ namespace {
         return P;
     }
 
-    // Old helpers (kept) ------------------------------------------------------
-
-    std::vector<Matrix> generateAllUnitLower(int n) {
-        int bits = n * (n - 1) / 2;
-        // Safety check: 2^20 is already over a million matrices.
-        if (bits > 20) return {};
-        
-        long long num_matrices = 1LL << bits;
-        std::vector<Matrix> result;
-        result.reserve((size_t)num_matrices);
-
-        for (long long mask = 0; mask < num_matrices; ++mask) {
-            Matrix L = createMatrix(n, n);
-            int b_idx = 0;
-            for (int i = 0; i < n; ++i) {
-                for (int j = 0; j < i; ++j) {
-                    L[i][j] = (int)((mask >> b_idx++) & 1LL);
-                }
-                L[i][i] = 1;
-            }
-            result.push_back(std::move(L));
-        }
-        return result;
-    }
-
-    std::vector<Matrix> generateAllUnitUpper(int n) {
-        int bits = n * (n - 1) / 2;
-        if (bits > 20) return {};
-
-        long long num_matrices = 1LL << bits;
-        std::vector<Matrix> result;
-        result.reserve((size_t)num_matrices);
-
-        for (long long mask = 0; mask < num_matrices; ++mask) {
-            Matrix U = createMatrix(n, n);
-            int b_idx = 0;
-            for (int i = 0; i < n; ++i) {
-                U[i][i] = 1;
-                for (int j = i + 1; j < n; ++j) {
-                    U[i][j] = (int)((mask >> b_idx++) & 1LL);
-                }
-            }
-            result.push_back(std::move(U));
-        }
-        return result;
-    }
-
-    // New helpers for Bruhat-aware generation --------------------------------
-
-    // Build the list of subdiagonal positions (i,j), i>j, that are FREE for L
-    // under the permutation p, i.e., those that are NOT inversions of p.
-    // Constraint: for any inversion (i>j with p[i] < p[j]) => L_{i,j} MUST be 0.
-    // So free positions are pairs (i>j) with p[i] > p[j].
-    inline std::vector<std::pair<int,int>>
-    freeLowerPositionsForL(const std::vector<int>& p) {
-        const int n = (int)p.size();
-        std::vector<std::pair<int,int>> freePos;
-        freePos.reserve(n*(n-1)/2);
-        for (int i = 0; i < n; ++i) {
+    // Finds positions (i, j) where i > j that correspond to inversions in p.
+    // An inversion is a pair (row_a, row_b) where row_a < row_b but p[row_a] > p[row_b].
+    // These are the positions where L can have a '1'.
+    std::vector<std::pair<int, int>> getInversionPositionsForL(const std::vector<int>& perm) {
+        int n = perm.size();
+        std::vector<std::pair<int, int>> positions;
+        for (int i = 1; i < n; ++i) {
             for (int j = 0; j < i; ++j) {
-                if (p[i] > p[j]) { // non-inversion relative to p
-                    freePos.emplace_back(i, j);
+                if (perm[j] > perm[i]) {
+                    positions.push_back({i, j});
                 }
             }
         }
-        return freePos;
+        return positions;
     }
 
-    // Generate ALL unit lower-triangular L respecting the zero-pattern given by p.
-    // Only positions in freePos can be nonzero; all others below diagonal are fixed 0.
-    std::vector<Matrix> generateAllUnitLowerBruhat(int n, const std::vector<int>& p) {
-        auto freePos = freeLowerPositionsForL(p);
-        const int f = (int)freePos.size();
-        if (f > 20) {
-            // Safety cap like before; you can lift this if you want to go bigger.
-            return {};
+    // Generates a Unit Lower triangular matrix constrained by allowed '1' positions.
+    Matrix generateConstrainedUnitLower(int n, const std::vector<std::pair<int, int>>& allowed_pos, long long mask) {
+        Matrix L = createMatrix(n, n);
+        for (int i = 0; i < n; ++i) {
+            L[i][i] = 1;
         }
-        const long long total = 1LL << f;
-        std::vector<Matrix> result;
-        result.reserve((size_t)total);
-
-        for (long long mask = 0; mask < total; ++mask) {
-            Matrix L = createMatrix(n, n);
-            // Unit diagonal:
-            for (int i = 0; i < n; ++i) L[i][i] = 1;
-            // Fill ONLY free positions from mask:
-            for (int b = 0; b < f; ++b) {
-                if ((mask >> b) & 1LL) {
-                    auto [i,j] = freePos[b];
-                    L[i][j] = 1;
-                }
+        for (size_t k = 0; k < allowed_pos.size(); ++k) {
+            if ((mask >> k) & 1) {
+                L[allowed_pos[k].first][allowed_pos[k].second] = 1;
             }
-            // All other subdiagonal entries (inversions) remain 0 by construction
-            result.push_back(std::move(L));
         }
-        return result;
+        return L;
+    }
+
+    // Generates a Unit Upper triangular matrix from a bitmask.
+    Matrix generateUnitUpperFromMask(int n, long long mask) {
+        Matrix U = createMatrix(n, n);
+        int b_idx = 0;
+        for (int i = 0; i < n; ++i) {
+            U[i][i] = 1;
+            for (int j = i + 1; j < n; ++j) {
+                U[i][j] = (mask >> b_idx++) & 1;
+            }
+        }
+        return U;
     }
 
 } // end anonymous namespace
@@ -156,96 +127,50 @@ namespace {
 // --- Public API Functions ---
 
 /**
- * @brief OLD brute-force enumeration via A = P * L * U. Kept for reference.
+ * @brief Generates all unique invertible n x n matrices over GF(2) using Bruhat decomposition.
+ * @param n The dimension of the matrices. Feasible for n <= 5.
+ * @return A vector of all unique invertible matrices.
  */
 std::vector<Matrix> generateAll(int n) {
     if (n <= 0) return {};
+    int bits = n * (n - 1) / 2;
+    // Safety check for upper matrix generation. 2^15 is already large.
+    if (bits > 15 && n > 5) return {};
 
-    auto lowers = generateAllUnitLower(n);
-    auto uppers = generateAllUnitUpper(n);
-    if (lowers.empty() || uppers.empty()) {
-        // This check catches cases where n is too large for the helpers.
-        return {};
-    }
+    std::vector<Matrix> unique_results;
+    
+    // The theoretical count can be very large, reserve memory if reasonable.
+    // For n=4, 20160. For n=5, 9999360.
+    if (n == 4) unique_results.reserve(20160);
 
     std::vector<int> p_vec(n);
     std::iota(p_vec.begin(), p_vec.end(), 0);
 
-    std::set<std::vector<int>> seen_matrices;
-    std::vector<Matrix> unique_results;
+    long long num_U_matrices = 1LL << bits;
 
+    // --- Main Loop: Iterate through each Bruhat cell, defined by a permutation P ---
     do {
         Matrix P = generatePermutationMatrix(p_vec);
-        for (const auto& L : lowers) {
-            Matrix PL = multiplyMatrix(P, L);
-            for (const auto& U : uppers) {
-                Matrix A = multiplyMatrix(PL, U);
+        Matrix PT = transposeMatrix(P); // P^-1 = P^T
 
-                std::vector<int> flat_matrix;
-                flat_matrix.reserve(n * n);
-                for (const auto& row : A) {
-                    flat_matrix.insert(flat_matrix.end(), row.begin(), row.end());
-                }
+        // 1. Determine the structure of L matrices for this cell
+        auto inversion_pos = getInversionPositionsForL(p_vec);
+        long long num_L_matrices = 1LL << inversion_pos.size();
 
-                if (seen_matrices.insert(flat_matrix).second) {
-                    unique_results.push_back(std::move(A));
-                }
+        // 2. Generate all matrices in this cell: A = P^T * L * U
+        for (long long l_mask = 0; l_mask < num_L_matrices; ++l_mask) {
+            Matrix L = generateConstrainedUnitLower(n, inversion_pos, l_mask);
+            Matrix PTL = multiplyMatrix(PT, L);
+
+            for (long long u_mask = 0; u_mask < num_U_matrices; ++u_mask) {
+                Matrix U = generateUnitUpperFromMask(n, u_mask);
+                Matrix A = multiplyMatrix(PTL, U);
+                unique_results.push_back(A);
             }
         }
     } while (std::next_permutation(p_vec.begin(), p_vec.end()));
 
     return unique_results;
-}
-
-/**
- * @brief NEW Bruhat-aware enumeration: A = P * L * U with L constrained by permutation inversions.
- *
- * For permutation p, subdiagonal entries (i>j) with p[i] < p[j] are FORCED zeros in L.
- * Only (i>j) with p[i] > p[j] are free. U is any unit upper-triangular matrix.
- *
- * @param n The dimension (practical n <= 6–7 with current safety caps).
- * @return A vector of unique invertible matrices; empty if n too large for caps.
- */
-std::vector<Matrix> generateAllBruhat(int n) {
-    if (n <= 0) return {};
-
-    // Pre-enumerate all unit upper-triangular U (unconstrained)
-    auto uppers = generateAllUnitUpper(n);
-    if (uppers.empty()) return {};
-
-    // Permutations
-    std::vector<int> p_vec(n);
-    std::iota(p_vec.begin(), p_vec.end(), 0);
-
-    std::set<std::vector<int>> seen;       // Safety: ensure uniqueness
-    std::vector<Matrix> results;
-    do {
-        // For this permutation, enumerate only L that respect the Bruhat zero pattern
-        auto lowersForP = generateAllUnitLowerBruhat(n, p_vec);
-        if (lowersForP.empty()) {
-            // If cap hit (too many free bits), abort to avoid explosion.
-            return {};
-        }
-
-        Matrix P = generatePermutationMatrix(p_vec);
-        for (const auto& L : lowersForP) {
-            Matrix PL = multiplyMatrix(P, L);
-            for (const auto& U : uppers) {
-                Matrix A = multiplyMatrix(PL, U);
-
-                // Flatten to deduplicate:
-                std::vector<int> flat;
-                flat.reserve(n*n);
-                for (const auto& r : A) flat.insert(flat.end(), r.begin(), r.end());
-
-                if (seen.insert(flat).second) {
-                    results.push_back(std::move(A));
-                }
-            }
-        }
-    } while (std::next_permutation(p_vec.begin(), p_vec.end()));
-
-    return results;
 }
 
 /**
@@ -262,7 +187,7 @@ bool saveMatricesToFile(const std::vector<Matrix>& matrices, const std::string& 
     for (const auto& matrix : matrices) {
         for (const auto& row : matrix) {
             for (size_t j = 0; j < row.size(); ++j) {
-                outFile << row[j] << (j + 1 == row.size() ? "" : " ");
+                outFile << row[j] << (j == row.size() - 1 ? "" : " ");
             }
             outFile << "\n";
         }
@@ -271,6 +196,6 @@ bool saveMatricesToFile(const std::vector<Matrix>& matrices, const std::string& 
     return true;
 }
 
-} // namespace ExhaustiveGenerator
+} // namespace InvertibleMatrixGenerator
 
 #endif // GENERATE_ALL_INVERTIBLE_MATRICES_HPP
