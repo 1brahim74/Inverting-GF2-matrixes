@@ -4,6 +4,7 @@
 //
 // Copyright (c) 2023, Ibrahim Mammadov
 // This code is a combination and refactoring of two original files.
+// Parallelism added using OpenMP tasks.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -35,6 +36,7 @@
 #include <ctime>
 #include <iomanip>
 #include <numeric>
+#include <omp.h> // Include OpenMP header
 
 namespace MatrixOps {
 
@@ -93,8 +95,9 @@ namespace {
         return U;
     }
 
-    // --- Helpers for Strassen Matrix Inversion (Reformatted for Readability) ---
-    const size_t STRASSEN_CUTOFF = 4;
+    // --- Helpers for Strassen Matrix Inversion ---
+    const size_t STRASSEN_CUTOFF = 16;  // Optimal cutoff can vary; 16 is a common starting point.
+    const size_t PARALLEL_CUTOFF = 64;  // Don't create threads for matrices smaller than this.
 
     // Forward declarations for recursive functions
     std::optional<BoolMatrix> strassenInverse(const BoolMatrix& A);
@@ -112,7 +115,7 @@ namespace {
     }
 
     BoolMatrix subtract(const BoolMatrix& A, const BoolMatrix& B) {
-        return add(A, B);
+        return add(A, B); // In GF(2), subtraction is the same as addition (XOR)
     }
 
     void split(const BoolMatrix& A, BoolMatrix& A11, BoolMatrix& A12, BoolMatrix& A21, BoolMatrix& A22) {
@@ -160,6 +163,7 @@ namespace {
             for (size_t i = 0; i < n; ++i) {
                 if (i != j && A[i][j]) {
                     for (size_t k = 0; k < n; ++k) {
+                        // CORRECTED LINES: Use = and ^, not ^=
                         A[i][k] = A[i][k] ^ A[j][k];
                         I[i][k] = I[i][k] ^ I[j][k];
                     }
@@ -175,11 +179,10 @@ namespace {
             BoolMatrix C(n, std::vector<bool>(n, false));
             for (size_t i = 0; i < n; ++i) {
                 for (size_t j = 0; j < n; ++j) {
-                    bool sum = false;
                     for (size_t k = 0; k < n; ++k) {
-                        sum = sum ^ (A[i][k] & B[k][j]);
+                        // CORRECTED LINE: Use = and ^, not ^=
+                        C[i][j] = C[i][j] ^ (A[i][k] & B[k][j]);
                     }
-                    C[i][j] = sum;
                 }
             }
             return C;
@@ -192,13 +195,44 @@ namespace {
         split(A, A11, A12, A21, A22);
         split(B, B11, B12, B21, B22);
 
-        BoolMatrix P1 = strassenMultiply(add(A11, A22), add(B11, B22));
-        BoolMatrix P2 = strassenMultiply(add(A21, A22), B11);
-        BoolMatrix P3 = strassenMultiply(A11, subtract(B12, B22));
-        BoolMatrix P4 = strassenMultiply(A22, subtract(B21, B11));
-        BoolMatrix P5 = strassenMultiply(add(A11, A12), B22);
-        BoolMatrix P6 = strassenMultiply(subtract(A21, A11), add(B11, B12));
-        BoolMatrix P7 = strassenMultiply(subtract(A12, A22), add(B21, B22));
+        BoolMatrix P1, P2, P3, P4, P5, P6, P7;
+
+        if (n > PARALLEL_CUTOFF) {
+            #pragma omp parallel
+            #pragma omp single
+            {
+                #pragma omp task
+                P1 = strassenMultiply(add(A11, A22), add(B11, B22));
+                
+                #pragma omp task
+                P2 = strassenMultiply(add(A21, A22), B11);
+
+                #pragma omp task
+                P3 = strassenMultiply(A11, subtract(B12, B22));
+
+                #pragma omp task
+                P4 = strassenMultiply(A22, subtract(B21, B11));
+
+                #pragma omp task
+                P5 = strassenMultiply(add(A11, A12), B22);
+
+                #pragma omp task
+                P6 = strassenMultiply(subtract(A21, A11), add(B11, B12));
+
+                #pragma omp task
+                P7 = strassenMultiply(subtract(A12, A22), add(B21, B22));
+                
+                #pragma omp taskwait
+            }
+        } else {
+            P1 = strassenMultiply(add(A11, A22), add(B11, B22));
+            P2 = strassenMultiply(add(A21, A22), B11);
+            P3 = strassenMultiply(A11, subtract(B12, B22));
+            P4 = strassenMultiply(A22, subtract(B21, B11));
+            P5 = strassenMultiply(add(A11, A12), B22);
+            P6 = strassenMultiply(subtract(A21, A11), add(B11, B12));
+            P7 = strassenMultiply(subtract(A12, A22), add(B21, B22));
+        }
 
         BoolMatrix C11 = add(subtract(add(P1, P4), P5), P7);
         BoolMatrix C12 = add(P3, P5);
@@ -216,7 +250,7 @@ namespace {
         size_t k = n / 2;
         BoolMatrix A11(k, std::vector<bool>(k)), A12(k, std::vector<bool>(k)), A21(k, std::vector<bool>(k)), A22(k, std::vector<bool>(k));
         split(A, A11, A12, A21, A22);
-
+        
         auto A11_inv_opt = strassenInverse(A11);
         if (A11_inv_opt) {
             BoolMatrix A11_inv = *A11_inv_opt;
@@ -227,9 +261,22 @@ namespace {
             if (!S_inv_opt) return std::nullopt;
             BoolMatrix S_inv = *S_inv_opt;
 
-            BoolMatrix A11_inv_A12 = strassenMultiply(A11_inv, A12);
-            BoolMatrix C12 = strassenMultiply(A11_inv_A12, S_inv);
-            BoolMatrix C21 = strassenMultiply(S_inv, A21_A11_inv);
+            BoolMatrix C12_temp, C21;
+            if (k > PARALLEL_CUTOFF / 2) {
+                #pragma omp parallel
+                #pragma omp single
+                {
+                    #pragma omp task
+                    C12_temp = strassenMultiply(A11_inv, A12);
+                    #pragma omp task
+                    C21 = strassenMultiply(S_inv, A21_A11_inv);
+                }
+            } else {
+                C12_temp = strassenMultiply(A11_inv, A12);
+                C21 = strassenMultiply(S_inv, A21_A11_inv);
+            }
+            
+            BoolMatrix C12 = strassenMultiply(C12_temp, S_inv);
             BoolMatrix C11 = add(A11_inv, strassenMultiply(C12, A21_A11_inv));
             BoolMatrix C22 = S_inv;
 
@@ -260,7 +307,7 @@ namespace {
 
     size_t nextPowerOfTwo(size_t n) {
         if (n == 0) return 1;
-        if ((n & (n - 1)) == 0) return n; // Already a power of two
+        if ((n & (n - 1)) == 0) return n;
         size_t p = 1;
         while (p < n) {
             p <<= 1;
@@ -287,6 +334,8 @@ std::optional<IntMatrix> generateInvertibleMatrix(int n) {
 }
 
 InversionResult invertMatrix(const BoolMatrix& A) {
+    omp_set_nested(1);
+
     size_t original_size = A.size();
     if (original_size == 0) {
         return { BoolMatrix{}, 0, 0 };
