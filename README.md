@@ -70,16 +70,31 @@ Creates matrix.txt containing a random, invertible 7×7 matrix
 
 ./invert             # Reads matrix.txt, computes its inverse, saves to answer.txt
 
+version 0.9.0: Beta version might have given late responses in edge cases
+
+version 1.0.0: Base version where it can give consistent result by switching strassen and gauss-jordan accoding to matrix
+
+version 1.0.1: Multithread (openMP) application which speeds up process up to 4 times.
 # 2. Generating All Invertible Matrices
 This tool exhaustively generates all unique invertible matrices for a given (small) size.
 
 cd Generating_Invertible_Matrices/
 ./gen_all            # Enter matrix size n (recommended ≤ 4): 3
+
+version 1.0.0: Base code with stable input and output interaction
+
+version 1.1.0: On-fly generation: instead of saving all generated matrixes, save just last matrix and generate out of that last matrix
+
+version 1.1.1: Multithread (openMP) application which speeds up process up to 4 times.
+
 # Computes all 168 unique invertible 3×3 matrices and saves to unique_GF2_matrices.txt
 
 # 3. Repairing Singular Matrices
 This workflow demonstrates generating a singular matrix and then repairing it to make it invertible.
 
+version 1.0.0: Base code with stable input and output interaction
+
+version 1.0.1: Multithread (openMP) application which speeds up process up to 4 times.
 
 cd Repairing_Singular_Matrices/
 
@@ -98,7 +113,7 @@ Creates matrix.txt containing a random, singular 7×7 matrix
 
 | File                                   | Version | Purpose                                                       | Input              | Output                    |
 | -------------------------------------- | ------- | ------------------------------------------------------------- | ------------------ | ------------------------- |
-| `strassen_inversion.cpp`       | 0.9.0   | Inverts a matrix using a pivoted Strassen‑based algorithm     | User prompt or `matrix.txt` | `answer.txt`              |
-| `generate_all_invertible_matrices.cpp` | 1.0.0   | Exhaustively generates all unique invertible matrices for n   | User prompt (size) | `unique_GF2_matrices.txt` |
-| `matrix_repair.cpp`         | 1.0.0   | Repairs a singular matrix using a provably correct algorithm  | `matrix.txt` or User prompt       | `answer.txt`              |
+| `strassen_inversion.cpp`       | 1.0.1   | Inverts a matrix using a pivoted Strassen‑based algorithm     | User prompt or `matrix.txt` | `answer.txt`              |
+| `generate_all_invertible_matrices.cpp` | 1.1.1   | Exhaustively generates all unique invertible matrices for n   | User prompt (size) | `unique_GF2_matrices.txt` |
+| `matrix_repair.cpp`         | 1.0.1   | Repairs a singular matrix using a provably correct algorithm  | `matrix.txt` or User prompt       | `answer.txt`              |
 
