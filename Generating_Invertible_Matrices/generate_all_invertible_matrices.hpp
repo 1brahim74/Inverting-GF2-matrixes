@@ -1,34 +1,13 @@
 #ifndef GENERATE_ALL_INVERTIBLE_MATRICES_HPP
 #define GENERATE_ALL_INVERTIBLE_MATRICES_HPP
 
-//
-// Copyright (c) 2023, Ibrahim Mammadov
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-//
-
 #include <vector>
 #include <string>
-#include <fstream>
 #include <numeric>   // For std::iota
 #include <algorithm> // For std::next_permutation
 #include <utility>   // For std::pair
+#include <iterator>  // For iterator traits
+#include <omp.h>     // For OpenMP
 
 /**
  * @brief A namespace for generating invertible matrices using Bruhat decomposition.
@@ -39,6 +18,7 @@ using Matrix = std::vector<std::vector<int>>;
 
 // --- Internal Helper Functions (Anonymous Namespace) ---
 namespace {
+    // These functions are implementation details and not part of the public API.
 
     Matrix createMatrix(int n, int m) {
         return Matrix(n, std::vector<int>(m, 0));
@@ -70,8 +50,7 @@ namespace {
         return T;
     }
 
-    Matrix generatePermutationMatrix(const std::vector<int>& perm) {
-        int n = perm.size();
+    Matrix generatePermutationMatrix(int n, const std::vector<int>& perm) {
         Matrix P = createMatrix(n, n);
         for (int i = 0; i < n; ++i) {
             P[i][perm[i]] = 1;
@@ -79,9 +58,6 @@ namespace {
         return P;
     }
 
-    // Finds positions (i, j) where i > j that correspond to inversions in p.
-    // An inversion is a pair (row_a, row_b) where row_a < row_b but p[row_a] > p[row_b].
-    // These are the positions where L can have a '1'.
     std::vector<std::pair<int, int>> getInversionPositionsForL(const std::vector<int>& perm) {
         int n = perm.size();
         std::vector<std::pair<int, int>> positions;
@@ -95,12 +71,9 @@ namespace {
         return positions;
     }
 
-    // Generates a Unit Lower triangular matrix constrained by allowed '1' positions.
     Matrix generateConstrainedUnitLower(int n, const std::vector<std::pair<int, int>>& allowed_pos, long long mask) {
         Matrix L = createMatrix(n, n);
-        for (int i = 0; i < n; ++i) {
-            L[i][i] = 1;
-        }
+        for (int i = 0; i < n; ++i) L[i][i] = 1;
         for (size_t k = 0; k < allowed_pos.size(); ++k) {
             if ((mask >> k) & 1) {
                 L[allowed_pos[k].first][allowed_pos[k].second] = 1;
@@ -109,7 +82,6 @@ namespace {
         return L;
     }
 
-    // Generates a Unit Upper triangular matrix from a bitmask.
     Matrix generateUnitUpperFromMask(int n, long long mask) {
         Matrix U = createMatrix(n, n);
         int b_idx = 0;
@@ -124,77 +96,181 @@ namespace {
 
 } // end anonymous namespace
 
-// --- Public API Functions ---
 
 /**
- * @brief Generates all unique invertible n x n matrices over GF(2) using Bruhat decomposition.
- * @param n The dimension of the matrices. Feasible for n <= 5.
- * @return A vector of all unique invertible matrices.
+ * @class BruhatGenerator
+ * @brief A C++17 range-based generator for iterating through all invertible n x n matrices over GF(2).
+ *
+ * This class allows iterating through the entire General Linear Group GL(n, 2) without
+ * storing all matrices in memory. It is highly memory-efficient.
+ *
+ * Usage:
+ *   BruhatGenerator generator(n);
+ *   for (const auto& matrix : generator) {
+ *       // process matrix
+ *   }
  */
-std::vector<Matrix> generateAll(int n) {
-    if (n <= 0) return {};
-    int bits = n * (n - 1) / 2;
-    // Safety check for upper matrix generation. 2^15 is already large.
-    if (bits > 15 && n > 5) return {};
+class BruhatGenerator {
+public:
+    // --- The Iterator Class ---
+    class iterator {
+    public:
+        // C++ Iterator Traits
+        using iterator_category = std::input_iterator_tag;
+        using value_type = Matrix;
+        using difference_type = std::ptrdiff_t;
+        using pointer = const Matrix*;
+        using reference = const Matrix&;
 
-    std::vector<Matrix> unique_results;
-    
-    // The theoretical count can be very large, reserve memory if reasonable.
-    // For n=4, 20160. For n=5, 9999360.
-    if (n == 4) unique_results.reserve(20160);
+        // Dereference operator
+        reference operator*() const { return current_matrix_; }
+        pointer operator->() const { return &current_matrix_; }
 
+        // Pre-increment operator (advances the state)
+        iterator& operator++() {
+            advance();
+            return *this;
+        }
+
+        // Equality comparison
+        bool operator!=(const iterator& other) const {
+            return is_done_ != other.is_done_;
+        }
+        
+        // Default constructor for the "end" iterator
+        iterator() : is_done_(true) {}
+
+        // Constructor for the "begin" iterator
+        explicit iterator(int n) : n_(n), is_done_(n <= 0) {
+            if (!is_done_) {
+                p_vec_.resize(n);
+                std::iota(p_vec_.begin(), p_vec_.end(), 0);
+
+                num_U_matrices_ = 1LL << (n * (n - 1) / 2);
+                u_mask_ = 0;
+                l_mask_ = 0;
+
+                update_permutation_dependent_state();
+                compute_current_matrix();
+            }
+        }
+
+    private:
+        void update_permutation_dependent_state() {
+            inversion_pos_ = getInversionPositionsForL(p_vec_);
+            num_L_matrices_ = 1LL << inversion_pos_.size();
+            PT_ = transposeMatrix(generatePermutationMatrix(n_, p_vec_));
+        }
+
+        void compute_current_matrix() {
+            Matrix L = generateConstrainedUnitLower(n_, inversion_pos_, l_mask_);
+            Matrix U = generateUnitUpperFromMask(n_, u_mask_);
+            current_matrix_ = multiplyMatrix(multiplyMatrix(PT_, L), U);
+        }
+
+        void advance() {
+            u_mask_++;
+            if (u_mask_ < num_U_matrices_) {
+                // Common case: just advance U
+            } else {
+                u_mask_ = 0;
+                l_mask_++;
+                if (l_mask_ < num_L_matrices_) {
+                    // Advance L
+                } else {
+                    l_mask_ = 0;
+                    if (std::next_permutation(p_vec_.begin(), p_vec_.end())) {
+                        // Advance to next permutation
+                        update_permutation_dependent_state();
+                    } else {
+                        // All permutations are done
+                        is_done_ = true;
+                        return;
+                    }
+                }
+            }
+            compute_current_matrix();
+        }
+
+        int n_ = 0;
+        bool is_done_ = false;
+
+        // State variables
+        std::vector<int> p_vec_;
+        std::vector<std::pair<int, int>> inversion_pos_;
+        long long u_mask_ = 0, l_mask_ = 0;
+        long long num_U_matrices_ = 0, num_L_matrices_ = 0;
+        Matrix PT_; // Cached transposed permutation matrix
+
+        Matrix current_matrix_;
+    };
+
+    // --- BruhatGenerator public methods ---
+    explicit BruhatGenerator(int n) : n_(n) {}
+
+    iterator begin() const { return iterator(n_); }
+    iterator end() const { return iterator(); }
+
+private:
+    int n_;
+};
+
+
+/**
+ * @brief Generates all unique invertible n x n matrices in parallel and processes them with a callback.
+ * @param n The dimension of the matrices.
+ * @param callback A function (e.g., a lambda) that will be called for each generated matrix.
+ *                 The callback must be thread-safe if it modifies shared data.
+ *
+ * This function is the fastest way to process all matrices for n >= 4, as it uses
+ * OpenMP to distribute the work across all available CPU cores.
+ *
+ * Example:
+ *   std::atomic<long long> count = 0;
+ *   generateAllParallel(n, [&](const Matrix& m) {
+ *       count++;
+ *   });
+ */
+template<typename Func>
+void generateAllParallel(int n, Func process_matrix) {
+    if (n <= 0) return;
+
+    // 1. Pre-generate all permutations
+    std::vector<std::vector<int>> all_perms;
     std::vector<int> p_vec(n);
     std::iota(p_vec.begin(), p_vec.end(), 0);
-
-    long long num_U_matrices = 1LL << bits;
-
-    // --- Main Loop: Iterate through each Bruhat cell, defined by a permutation P ---
     do {
-        Matrix P = generatePermutationMatrix(p_vec);
-        Matrix PT = transposeMatrix(P); // P^-1 = P^T
+        all_perms.push_back(p_vec);
+    } while (std::next_permutation(p_vec.begin(), p_vec.end()));
 
-        // 1. Determine the structure of L matrices for this cell
-        auto inversion_pos = getInversionPositionsForL(p_vec);
+    const long long num_U_matrices = 1LL << (n * (n - 1) / 2);
+
+    // 2. Parallel loop over the permutations (this is the main work distribution)
+    #pragma omp parallel for schedule(dynamic)
+    for (size_t i = 0; i < all_perms.size(); ++i) {
+        const auto& p = all_perms[i];
+
+        // Each thread computes its own P^T and L structure
+        Matrix PT = transposeMatrix(generatePermutationMatrix(n, p));
+        auto inversion_pos = getInversionPositionsForL(p);
         long long num_L_matrices = 1LL << inversion_pos.size();
 
-        // 2. Generate all matrices in this cell: A = P^T * L * U
+        // Inner loops are executed by each thread for its assigned permutation
         for (long long l_mask = 0; l_mask < num_L_matrices; ++l_mask) {
             Matrix L = generateConstrainedUnitLower(n, inversion_pos, l_mask);
-            Matrix PTL = multiplyMatrix(PT, L);
+            Matrix PTL = multiplyMatrix(PT, L); // Pre-compute for the inner-most loop
 
             for (long long u_mask = 0; u_mask < num_U_matrices; ++u_mask) {
                 Matrix U = generateUnitUpperFromMask(n, u_mask);
                 Matrix A = multiplyMatrix(PTL, U);
-                unique_results.push_back(A);
+                
+                // Call the user-provided function to process the matrix
+                process_matrix(A);
             }
         }
-    } while (std::next_permutation(p_vec.begin(), p_vec.end()));
-
-    return unique_results;
+    }
 }
 
-/**
- * @brief Saves a collection of matrices to a file.
- * @param matrices The vector of matrices to save.
- * @param filename The name of the file to save to.
- * @return true on success, false on file opening error.
- */
-bool saveMatricesToFile(const std::vector<Matrix>& matrices, const std::string& filename) {
-    std::ofstream outFile(filename);
-    if (!outFile.is_open()) {
-        return false;
-    }
-    for (const auto& matrix : matrices) {
-        for (const auto& row : matrix) {
-            for (size_t j = 0; j < row.size(); ++j) {
-                outFile << row[j] << (j == row.size() - 1 ? "" : " ");
-            }
-            outFile << "\n";
-        }
-        outFile << "\n"; // Blank line separator
-    }
-    return true;
-}
 
 } // namespace InvertibleMatrixGenerator
 
