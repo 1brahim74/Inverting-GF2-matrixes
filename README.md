@@ -94,7 +94,7 @@ This workflow demonstrates generating a singular matrix and then repairing it to
 
 version 1.0.0: Base code with stable input and output interaction
 
-version 1.0.1: Multithread (openMP) application which speeds up process up to 4 times.
+version 1.0.1: Multithread (openMP) application which extremely fast computational power up to the size n=2048.
 
 cd Repairing_Singular_Matrices/
 

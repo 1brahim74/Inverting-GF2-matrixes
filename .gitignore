@@ -5,3 +5,10 @@ Repairing_Singular_Matrices(initial)/matrix_repair.cpp
 Repairing_Singular_Matrices(initial)/singular_matrix_generator.cpp
 Binary_Matrix_Inversion(initial)/Invertible_matrix_generator.cpp
 Binary_Matrix_Inversion(initial)/strassen_inversion.cpp
+bug_finder
+bug_finder.cpp
+generate_all_invertible_matrices.hpp
+main.cpp
+robust_inversion.hpp
+.vscode/c_cpp_properties.json
+.vscode/settings.json
