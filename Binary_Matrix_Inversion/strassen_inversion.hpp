@@ -261,4 +261,4 @@ namespace MatrixOps {
 
 } // namespace MatrixOps
 
-#endif // STRASSEN_INVERSION_HPP
+#endif // STRASSEN_INVERSION_HPP 
