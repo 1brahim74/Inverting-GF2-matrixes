@@ -6,7 +6,6 @@
 #include <optional>
 #include <limits>
 #include "strassen_inversion.hpp"
-
 // Use the MatrixOps namespace
 using namespace MatrixOps;
 
