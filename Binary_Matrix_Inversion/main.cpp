@@ -5,7 +5,7 @@
 #include <vector>
 #include <optional>
 #include <limits>
-#include "strassen_inversion.hpp" // Changed from "robust_inversion.hpp"
+#include "strassen_inversion.hpp"
 
 // Use the MatrixOps namespace
 using namespace MatrixOps;
@@ -86,7 +86,7 @@ std::optional<BoolMatrix> readMatrixFromTerminal() {
             row.push_back(val != 0);
         }
         
-        if (row.empty()) { // Could be a line with only whitespace
+        if (row.empty()) {
              if(matrix.empty()) {
                 std::cout << "Input started with an empty line. Finishing input.\n";
                 break;
@@ -119,7 +119,7 @@ int main() {
     const std::string MATRIX_FILE = "matrix.txt";
     const std::string ANSWER_FILE = "answer.txt";
 
-    std::cout << "--- Robust Matrix Inverter using Strassen & LUP Decomposition ---\n";
+    std::cout << "--- Robust Matrix Inverter using Iterative LUP Decomposition ---\n";
 
     // --- Get Input Choice ---
     int input_choice = 0;
@@ -135,7 +135,7 @@ int main() {
             input_choice = 0;
         }
     }
-    clear_cin(); // Clear the rest of the line after reading the number
+    clear_cin(); 
 
     // --- Load Matrix ---
     std::optional<BoolMatrix> matrix_opt;
